@@ -118,9 +118,12 @@ class HomeAssistantApi {
     suspend fun fetchEntities(creds: HaCredentials): HaTemplateResponse {
         val base = cleanUrl(creds.serverUrl)
         val template = """
+        {% set label_entities_list1 = label_entities('Light Phone') | default([]) %}
+        {% set label_entities_list2 = label_entities('light-phone') | default([]) %}
+        {% set label_entities_list3 = label_entities('light_phone') | default([]) %}
         {% set area_entities_list = area_entities('Light Phone') | default([]) %}
         {% set group_entities_list = expand('group.light_phone') | map(attribute='entity_id') | list if states('group.light_phone') != 'unknown' else [] %}
-        {% set filter_list = area_entities_list + group_entities_list %}
+        {% set filter_list = label_entities_list1 + label_entities_list2 + label_entities_list3 + area_entities_list + group_entities_list %}
         {
           "lights": [
             {% set comma = joiner() %}

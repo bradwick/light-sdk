@@ -877,11 +877,19 @@ class TextInputEditorScreen(
         val themeColors by LightThemeController.colors.collectAsState()
         val keyboardOptionsFlow = rememberKeyboardOptions()
         LightTheme(colors = themeColors) {
+            // Intercept newline (enter/return key) and submit immediately!
+            androidx.compose.runtime.LaunchedEffect(textState.text) {
+                if (textState.text.contains("\n")) {
+                    val cleaned = textState.text.toString().replace("\n", "").trim()
+                    goBack(cleaned)
+                }
+            }
+
             LightTextInputEditor(
                 title = title,
                 state = textState,
                 keyboardOptionsFlow = keyboardOptionsFlow,
-                onSubmit = { result -> goBack(result.toString()) },
+                onSubmit = { result -> goBack(result.toString().trim()) },
                 onBack = { goBack(null) },
                 modifier = Modifier.background(LightThemeTokens.colors.background)
             )

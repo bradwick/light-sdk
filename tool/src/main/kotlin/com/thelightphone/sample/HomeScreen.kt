@@ -101,6 +101,13 @@ class HomeScreenViewModel(
     private val _entities = MutableStateFlow<HaTemplateResponse?>(null)
     val entities: StateFlow<HaTemplateResponse?> = _entities.asStateFlow()
 
+    // Form inputs preserved across transitions
+    var loginMethod by mutableStateOf(LoginMethod.UsernamePassword)
+    var serverUrl by mutableStateOf("")
+    var username by mutableStateOf("")
+    var password by mutableStateOf("")
+    var accessToken by mutableStateOf("")
+
     init {
         viewModelScope.launch {
             loadCredentials()
@@ -109,13 +116,15 @@ class HomeScreenViewModel(
 
     private suspend fun loadCredentials() {
         val prefs = dataStore.data.first()
-        val url = prefs[HaPreferences.SERVER_URL]
-        val accessToken = prefs[HaPreferences.ACCESS_TOKEN]
+        val url = prefs[HaPreferences.SERVER_URL] ?: ""
+        val accessTokenVal = prefs[HaPreferences.ACCESS_TOKEN] ?: ""
         val refreshToken = prefs[HaPreferences.REFRESH_TOKEN]
         val expiresAt = prefs[HaPreferences.EXPIRES_AT]?.toLongOrNull() ?: 0L
 
-        if (!url.isNullOrEmpty() && !accessToken.isNullOrEmpty()) {
-            val creds = HaCredentials(url, accessToken, refreshToken, expiresAt)
+        serverUrl = url
+        if (accessTokenVal.isNotEmpty()) {
+            accessToken = accessTokenVal
+            val creds = HaCredentials(url, accessTokenVal, refreshToken, expiresAt)
             _credentials.value = creds
             // Try refreshing or loading entities
             refreshAndFetch(creds)
@@ -183,16 +192,24 @@ class HomeScreenViewModel(
         refreshAndFetch(creds)
     }
 
-    fun loginWithToken(serverUrl: String, token: String) {
-        if (serverUrl.isBlank() || token.isBlank()) {
-            _error.value = "Please fill in all fields."
+    fun handleLogin() {
+        if (loginMethod == LoginMethod.UsernamePassword) {
+            loginWithCredentials(serverUrl, username, password)
+        } else {
+            loginWithToken(serverUrl, accessToken)
+        }
+    }
+
+    private fun loginWithToken(urlValue: String, token: String) {
+        if (urlValue.isBlank() || token.isBlank()) {
+            _error.value = "Please fill in Server URL and Access Token."
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _error.value = null
             try {
-                val creds = HaCredentials(serverUrl = serverUrl, accessToken = token)
+                val creds = HaCredentials(serverUrl = urlValue, accessToken = token)
                 // Test the connection
                 api.fetchEntities(creds)
                 saveCredentials(creds)
@@ -207,21 +224,21 @@ class HomeScreenViewModel(
         }
     }
 
-    fun loginWithCredentials(serverUrl: String, username: String, password: String) {
-        if (serverUrl.isBlank() || username.isBlank() || password.isBlank()) {
-            _error.value = "Please fill in all fields."
+    private fun loginWithCredentials(urlValue: String, usernameValue: String, passwordValue: String) {
+        if (urlValue.isBlank() || usernameValue.isBlank() || passwordValue.isBlank()) {
+            _error.value = "Please fill in Server URL, Username, and Password."
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _error.value = null
             try {
-                val flowId = api.startLoginFlow(serverUrl)
-                val code = api.submitLoginCredentials(serverUrl, flowId, username, password)
-                val tokenResponse = api.exchangeCodeForToken(serverUrl, code)
+                val flowId = api.startLoginFlow(urlValue)
+                val code = api.submitLoginCredentials(urlValue, flowId, usernameValue, passwordValue)
+                val tokenResponse = api.exchangeCodeForToken(urlValue, code)
 
                 val creds = HaCredentials(
-                    serverUrl = serverUrl,
+                    serverUrl = urlValue,
                     accessToken = tokenResponse.access_token,
                     refreshToken = tokenResponse.refresh_token,
                     expiresAt = System.currentTimeMillis() + (tokenResponse.expires_in * 1000L)
@@ -378,11 +395,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     .background(LightThemeTokens.colors.background)
             ) {
                 if (credentials == null) {
-                    LoginView(
-                        isLoading = isLoading,
-                        onLoginWithToken = viewModel::loginWithToken,
-                        onLoginWithCredentials = viewModel::loginWithCredentials
-                    )
+                    LoginView(isLoading = isLoading)
                 } else {
                     DashboardView(
                         entities = entities,
@@ -435,17 +448,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
     }
 
     @Composable
-    private fun LoginView(
-        isLoading: Boolean,
-        onLoginWithToken: (String, String) -> Unit,
-        onLoginWithCredentials: (String, String, String) -> Unit
-    ) {
-        var loginMethod by remember { mutableStateOf(LoginMethod.UsernamePassword) }
-        var serverUrl by remember { mutableStateOf("") }
-        var username by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var accessToken by remember { mutableStateOf("") }
-
+    private fun LoginView(isLoading: Boolean) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -460,12 +463,12 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
 
             LightTextField(
                 label = "Server URL",
-                value = serverUrl,
+                value = viewModel.serverUrl,
                 placeholder = "http://192.168.1.100:8123",
                 onClick = {
                     navigateTo(
-                        screenFactory = { TextInputEditorScreen(it, "Server URL", serverUrl) },
-                        resultCallback = { if (it != null) serverUrl = it }
+                        screenFactory = { TextInputEditorScreen(it, "Server URL", viewModel.serverUrl) },
+                        resultCallback = { if (it != null) viewModel.serverUrl = it }
                     )
                 }
             )
@@ -482,10 +485,10 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     lighten = true
                 )
                 LightText(
-                    text = if (loginMethod == LoginMethod.UsernamePassword) "[ USER/PASS ]" else "[ ACCESS TOKEN ]",
+                    text = if (viewModel.loginMethod == LoginMethod.UsernamePassword) "[ USER/PASS ]" else "[ ACCESS TOKEN ]",
                     variant = LightTextVariant.Detail,
                     modifier = Modifier.lightClickable {
-                        loginMethod = if (loginMethod == LoginMethod.UsernamePassword) {
+                        viewModel.loginMethod = if (viewModel.loginMethod == LoginMethod.UsernamePassword) {
                             LoginMethod.AccessToken
                         } else {
                             LoginMethod.UsernamePassword
@@ -494,39 +497,39 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                 )
             }
 
-            if (loginMethod == LoginMethod.UsernamePassword) {
+            if (viewModel.loginMethod == LoginMethod.UsernamePassword) {
                 LightTextField(
                     label = "Username",
-                    value = username,
+                    value = viewModel.username,
                     placeholder = "homeassistant",
                     onClick = {
                         navigateTo(
-                            screenFactory = { TextInputEditorScreen(it, "Username", username) },
-                            resultCallback = { if (it != null) username = it }
+                            screenFactory = { TextInputEditorScreen(it, "Username", viewModel.username) },
+                            resultCallback = { if (it != null) viewModel.username = it }
                         )
                     }
                 )
 
                 LightTextField(
                     label = "Password",
-                    value = password,
+                    value = viewModel.password,
                     placeholder = "••••••••",
                     onClick = {
                         navigateTo(
-                            screenFactory = { TextInputEditorScreen(it, "Password", password) },
-                            resultCallback = { if (it != null) password = it }
+                            screenFactory = { TextInputEditorScreen(it, "Password", viewModel.password) },
+                            resultCallback = { if (it != null) viewModel.password = it }
                         )
                     }
                 )
             } else {
                 LightTextField(
                     label = "Long-Lived Access Token",
-                    value = accessToken,
+                    value = viewModel.accessToken,
                     placeholder = "eyJhbGciOi...",
                     onClick = {
                         navigateTo(
-                            screenFactory = { TextInputEditorScreen(it, "Long-Lived Access Token", accessToken) },
-                            resultCallback = { if (it != null) accessToken = it }
+                            screenFactory = { TextInputEditorScreen(it, "Long-Lived Access Token", viewModel.accessToken) },
+                            resultCallback = { if (it != null) viewModel.accessToken = it }
                         )
                     }
                 )
@@ -548,13 +551,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     align = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .lightClickable {
-                            if (loginMethod == LoginMethod.UsernamePassword) {
-                                onLoginWithCredentials(serverUrl, username, password)
-                            } else {
-                                onLoginWithToken(serverUrl, accessToken)
-                            }
-                        }
+                        .lightClickable { viewModel.handleLogin() }
                         .padding(vertical = 12.dp)
                 )
             }

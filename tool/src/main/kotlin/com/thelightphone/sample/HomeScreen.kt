@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
@@ -36,6 +36,7 @@ import com.thelightphone.sdk.LightScreen
 import com.thelightphone.sdk.LightViewModel
 import com.thelightphone.sdk.SealedLightActivity
 import com.thelightphone.sdk.SimpleLightScreen
+import com.thelightphone.sdk.rememberKeyboardOptions
 import com.thelightphone.sdk.ui.LightBarButton
 import com.thelightphone.sdk.ui.LightBottomBar
 import com.thelightphone.sdk.ui.LightFullscreenModal
@@ -43,6 +44,7 @@ import com.thelightphone.sdk.ui.LightIcon
 import com.thelightphone.sdk.ui.LightIcons
 import com.thelightphone.sdk.ui.LightTextField
 import com.thelightphone.sdk.ui.LightText
+import com.thelightphone.sdk.ui.LightTextInputEditor
 import com.thelightphone.sdk.ui.LightTextVariant
 import com.thelightphone.sdk.ui.LightTheme
 import com.thelightphone.sdk.ui.LightThemeController
@@ -462,7 +464,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                 placeholder = "http://192.168.1.100:8123",
                 onClick = {
                     navigateTo(
-                        screenFactory = { UiDemoTextInputEditorScreen(it, EditorRequest("Server URL", serverUrl)) },
+                        screenFactory = { TextInputEditorScreen(it, "Server URL", serverUrl) },
                         resultCallback = { if (it != null) serverUrl = it }
                     )
                 }
@@ -482,7 +484,6 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                 LightText(
                     text = if (loginMethod == LoginMethod.UsernamePassword) "[ USER/PASS ]" else "[ ACCESS TOKEN ]",
                     variant = LightTextVariant.Detail,
-                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.lightClickable {
                         loginMethod = if (loginMethod == LoginMethod.UsernamePassword) {
                             LoginMethod.AccessToken
@@ -500,7 +501,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     placeholder = "homeassistant",
                     onClick = {
                         navigateTo(
-                            screenFactory = { UiDemoTextInputEditorScreen(it, EditorRequest("Username", username)) },
+                            screenFactory = { TextInputEditorScreen(it, "Username", username) },
                             resultCallback = { if (it != null) username = it }
                         )
                     }
@@ -512,7 +513,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     placeholder = "••••••••",
                     onClick = {
                         navigateTo(
-                            screenFactory = { UiDemoTextInputEditorScreen(it, EditorRequest("Password", password)) },
+                            screenFactory = { TextInputEditorScreen(it, "Password", password) },
                             resultCallback = { if (it != null) password = it }
                         )
                     }
@@ -524,7 +525,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     placeholder = "eyJhbGciOi...",
                     onClick = {
                         navigateTo(
-                            screenFactory = { UiDemoTextInputEditorScreen(it, EditorRequest("Long-Lived Access Token", accessToken)) },
+                            screenFactory = { TextInputEditorScreen(it, "Long-Lived Access Token", accessToken) },
                             resultCallback = { if (it != null) accessToken = it }
                         )
                     }
@@ -537,14 +538,14 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                 LightText(
                     text = "Connecting...",
                     variant = LightTextVariant.Copy,
-                    textAlign = TextAlign.Center,
+                    align = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
                 LightText(
                     text = "LOGIN",
                     variant = LightTextVariant.Heading,
-                    textAlign = TextAlign.Center,
+                    align = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
                         .lightClickable {
@@ -594,10 +595,10 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 LightText(
-                    text = "Curation: Configure 'Light Phone' Area/Group on PC",
+                    text = "Curation: Configure 'Light Phone' Label on PC",
                     variant = LightTextVariant.Detail,
                     lighten = true,
-                    textAlign = TextAlign.Center,
+                    align = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -627,14 +628,14 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                         text = "Syncing with Home Assistant...",
                         variant = LightTextVariant.Copy,
                         modifier = Modifier.padding(vertical = 32.dp),
-                        textAlign = TextAlign.Center
+                        align = TextAlign.Center
                     )
                 } else if (entities == null) {
                     LightText(
                         text = "No connection data. Please refresh.",
                         variant = LightTextVariant.Copy,
                         modifier = Modifier.padding(vertical = 32.dp),
-                        textAlign = TextAlign.Center
+                        align = TextAlign.Center
                     )
                 } else {
                     when (selectedTab) {
@@ -664,8 +665,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
         val style = if (isSelected) "[ $label ]" else label
         LightText(
             text = style,
-            variant = LightTextVariant.Detail,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            variant = if (isSelected) LightTextVariant.Heading else LightTextVariant.Detail,
             modifier = Modifier
                 .lightClickable(onClick = onClick)
                 .padding(8.dp)
@@ -728,8 +728,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                     Column {
                         LightText(
                             text = climate.name,
-                            variant = LightTextVariant.Copy,
-                            fontWeight = FontWeight.Bold
+                            variant = LightTextVariant.Heading
                         )
                         // HVAC Mode Selector Button
                         Row(
@@ -814,7 +813,7 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                             navigateTo(
                                 screenFactory = { ScriptParamsScreen(it, script) },
                                 resultCallback = { params ->
-                                    if (it != null && params != null) {
+                                    if (params != null) {
                                         onTriggerScript(script, params)
                                     }
                                 }
@@ -860,7 +859,34 @@ class HomeScreen(sealedActivity: SealedLightActivity) : LightScreen<Unit, HomeSc
                 text = message,
                 variant = LightTextVariant.Copy,
                 lighten = true,
-                textAlign = TextAlign.Center
+                align = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Text Input Editor Screen implemented locally to keep dependencies perfectly self-contained
+ */
+class TextInputEditorScreen(
+    sealedActivity: SealedLightActivity,
+    private val title: String,
+    private val initialValue: String
+) : SimpleLightScreen<String>(sealedActivity) {
+
+    @Composable
+    override fun Content() {
+        val textState = rememberTextFieldState(initialValue)
+        val themeColors by LightThemeController.colors.collectAsState()
+        val keyboardOptionsFlow = rememberKeyboardOptions()
+        LightTheme(colors = themeColors) {
+            LightTextInputEditor(
+                title = title,
+                state = textState,
+                keyboardOptionsFlow = keyboardOptionsFlow,
+                onSubmit = { result -> goBack(result.toString()) },
+                onBack = { goBack(null) },
+                modifier = Modifier.background(LightThemeTokens.colors.background)
             )
         }
     }

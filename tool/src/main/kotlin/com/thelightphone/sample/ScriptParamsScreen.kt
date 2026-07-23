@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.thelightphone.sdk.SealedLightActivity
@@ -75,8 +74,7 @@ class ScriptParamsScreen(
 
                     LightText(
                         text = "Expected Parameters:",
-                        variant = LightTextVariant.Detail,
-                        fontWeight = FontWeight.Bold,
+                        variant = LightTextVariant.Heading,
                         lighten = true
                     )
 
@@ -98,8 +96,8 @@ class ScriptParamsScreen(
                         placeholder = "e.g.\nbrightness=255\ntime=10",
                         onClick = {
                             navigateTo(
-                                screenFactory = { UiDemoTextInputEditorScreen(it, EditorRequest("Parameter Values", paramsText)) },
-                                resultCallback = { if (it != null) paramsText = it }
+                                screenFactory = { TextInputEditorScreen(it, "Parameter Values", paramsText) },
+                                resultCallback = { result -> if (result != null) paramsText = result }
                             )
                         }
                     )
@@ -109,7 +107,7 @@ class ScriptParamsScreen(
                     LightText(
                         text = "TRIGGER SCRIPT",
                         variant = LightTextVariant.Heading,
-                        textAlign = TextAlign.Center,
+                        align = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
                             .lightClickable {
